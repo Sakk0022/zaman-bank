@@ -1,12 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FiEye, FiEyeOff, FiMic } from 'react-icons/fi';
 import logoImage from './assets/zamat.jpeg';
-import axios from 'axios'; // For sending to backend
-
-// Zaman color tokens
-// Persian Green: #2D9A86
-// Solar: #EEFE6D
-// Cloud: white
+import axios from 'axios';
 
 const BACKEND_URL = 'https://zaman-bank.onrender.com';
 
@@ -16,9 +11,9 @@ export default function ZamanAIPrototype() {
   ]);
   const [input, setInput] = useState('');
   const [listening, setListening] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false); // New: for loading indicator
+  const [isGenerating, setIsGenerating] = useState(false);
   const inputRef = useRef();
-  const chatRef = useRef(); // New: for auto-scroll
+  const chatRef = useRef();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authMode, setAuthMode] = useState('login');
   const [username, setUsername] = useState('');
@@ -26,32 +21,28 @@ export default function ZamanAIPrototype() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [userId, setUserId] = useState('test_user'); // Fixed user_id for prototype
+  const [userId, setUserId] = useState('test_user');
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const audioStreamRef = useRef(null);
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (chatRef.current) {
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
     }
   }, [messages]);
 
-  // Start recording (on hold/press down)
   function startRecording() {
-    if (listening) return; // Already recording
+    if (listening) return;
     setListening(true);
-    console.log('Starting recording...'); // Debug
 
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(stream => {
         audioStreamRef.current = stream;
-
-        // Detect supported MIME type for cross-browser compatibility
         let mimeType = '';
         let fileExtension = 'webm';
+        
         if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
           mimeType = 'audio/webm;codecs=opus';
         } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
@@ -62,12 +53,10 @@ export default function ZamanAIPrototype() {
         } else {
           throw new Error('No supported audio MIME type found.');
         }
-        console.log('Using MIME type:', mimeType); // Debug
 
         try {
           const recorder = new MediaRecorder(stream, { mimeType });
-
-          // Set handlers before starting
+          
           recorder.ondataavailable = event => {
             if (event.data.size > 0) {
               audioChunksRef.current.push(event.data);
@@ -75,14 +64,9 @@ export default function ZamanAIPrototype() {
           };
 
           recorder.onstop = () => {
-            console.log('Recording stopped, processing audio...'); // Debug
             const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
             const audioFile = new File([audioBlob], `recording.${fileExtension}`, { type: mimeType });
-
-            // Send to backend
             sendAudioToBackend(audioFile);
-
-            // Cleanup
             audioChunksRef.current = [];
             if (audioStreamRef.current) {
               audioStreamRef.current.getTracks().forEach(track => track.stop());
@@ -93,65 +77,52 @@ export default function ZamanAIPrototype() {
 
           mediaRecorderRef.current = recorder;
           audioChunksRef.current = [];
-          recorder.start(250); // Timeslice for smoother chunking
-          console.log('Recording started.'); // Debug
+          recorder.start(250);
         } catch (error) {
           console.error('Error creating MediaRecorder:', error);
-          alert('Не удалось создать запись. Браузер может не поддерживать формат.');
+          alert('Не удалось создать запись.');
           setListening(false);
         }
       })
       .catch(error => {
         console.error('Ошибка доступа к микрофону:', error);
-        alert('Не удалось получить доступ к микрофону. Проверьте разрешения.');
+        alert('Не удалось получить доступ к микрофону.');
         setListening(false);
       });
   }
 
-  // Stop recording (on release)
   function stopRecording() {
     if (!listening || !mediaRecorderRef.current) return;
-    console.log('Stopping recording...'); // Debug
     setListening(false);
     mediaRecorderRef.current.stop();
-    // Additional cleanup if needed
     if (audioStreamRef.current) {
       audioStreamRef.current.getTracks().forEach(track => track.stop());
     }
   }
 
   async function sendAudioToBackend(file) {
-    // Add user message placeholder (transcription will replace it later)
     const tempUserMsg = { id: Date.now(), from: 'user', text: 'Голосовое сообщение...' };
     setMessages(m => [...m, tempUserMsg]);
-
-    // Show generating indicator
     setIsGenerating(true);
     const generatingMsgId = Date.now() + 1;
     setMessages(m => [...m, { id: generatingMsgId, from: 'assistant', text: 'Думает...', isGenerating: true }]);
 
     const formData = new FormData();
-    formData.append('file', file); // Match backend's expected key 'file'
+    formData.append('file', file);
 
     try {
       const response = await axios.post(`${BACKEND_URL}/transcribe`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       const { transcribed, response: aiResponse } = response.data;
-      console.log('Transcription received:', transcribed); // Debug
-      console.log('AI response:', aiResponse); // Debug
 
-      // Replace temp user message with transcribed text
       setMessages(m => m.map(msg => msg.id === tempUserMsg.id ? { ...msg, text: transcribed } : msg));
-
-      // Remove generating indicator and add real assistant message
       setMessages(m => m.filter(msg => msg.id !== generatingMsgId));
       const assistantMsg = { id: Date.now(), from: 'assistant', text: aiResponse };
       setMessages(m => [...m, assistantMsg]);
     } catch (error) {
       console.error('Ошибка отправки аудио:', error);
       alert('Не удалось отправить аудио на сервер.');
-      // Remove temp messages on error
       setMessages(m => m.filter(msg => msg.id !== tempUserMsg.id && msg.id !== generatingMsgId));
     } finally {
       setIsGenerating(false);
@@ -161,17 +132,14 @@ export default function ZamanAIPrototype() {
   async function sendMessage() {
     if (!input.trim()) return;
 
-    // Add user message to UI first
     const userMsg = { id: Date.now(), from: 'user', text: input };
     setMessages(m => [...m, userMsg]);
     setInput('');
 
-    // Show generating indicator
     setIsGenerating(true);
     const generatingMsgId = Date.now() + 1;
     setMessages(m => [...m, { id: generatingMsgId, from: 'assistant', text: 'Думает...', isGenerating: true }]);
 
-    // Prepare chat history for backend (exclude ids)
     const chatMessages = messages.map(m => ({ role: m.from, content: m.text }));
     chatMessages.push({ role: 'user', content: input });
 
@@ -182,14 +150,12 @@ export default function ZamanAIPrototype() {
       });
       const aiResponse = response.data.response;
 
-      // Remove generating indicator and add real assistant message
       setMessages(m => m.filter(msg => msg.id !== generatingMsgId));
       const assistantMsg = { id: Date.now(), from: 'assistant', text: aiResponse };
       setMessages(m => [...m, assistantMsg]);
     } catch (error) {
       console.error('Ошибка отправки сообщения:', error);
       alert('Не удалось получить ответ от сервера.');
-      // Remove generating on error
       setMessages(m => m.filter(msg => msg.id !== generatingMsgId));
     } finally {
       setIsGenerating(false);
@@ -212,7 +178,7 @@ export default function ZamanAIPrototype() {
         return;
       }
     }
-    setUserId(username || 'test_user'); // Set userId based on username
+    setUserId(username || 'test_user');
     setIsLoggedIn(true);
     setUsername('');
     setPassword('');
@@ -230,7 +196,6 @@ export default function ZamanAIPrototype() {
     setShowConfirmPassword(false);
   }
 
-  // Handle Enter key for sending message
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -240,19 +205,21 @@ export default function ZamanAIPrototype() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen  flex items-center justify-center" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui' }}>
-        <div className="w-full max-w-md p-6 sm:p-8 rounded-2xl shadow-md bg-white mx-auto">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md p-6 rounded-2xl shadow-md bg-surface">
           <div className="flex justify-center mb-6">
             <img src={logoImage} alt="Логотип Zaman" className="w-14 h-14 rounded-xl object-cover" />
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-center mb-6">{authMode === 'login' ? 'Вход в Zaman AI Bank' : 'Регистрация в Zaman AI Bank'}</h2>
-          <form onSubmit={handleAuthSubmit} className="space-y-4 text-left">
+          <h2 className="text-2xl font-bold text-center mb-6 text-text">
+            {authMode === 'login' ? 'Вход в Zaman AI Bank' : 'Регистрация в Zaman AI Bank'}
+          </h2>
+          <form onSubmit={handleAuthSubmit} className="space-y-4">
             <input
               type="text"
               placeholder="Логин"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border focus:outline-none text-sm sm:text-base text-left"
+              className="w-full px-4 py-3 rounded-xl border focus:outline-none text-base"
               required
               minLength={1}
             />
@@ -262,14 +229,14 @@ export default function ZamanAIPrototype() {
                 placeholder="Пароль"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border focus:outline-none text-sm sm:text-base text-left"
+                className="w-full px-4 py-3 rounded-xl border focus:outline-none text-base"
                 required
                 minLength={5}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-3 flex items-center pr-3 text-gray-500 bg-transparent"
+                className="absolute inset-y-0 right-3 flex items-center pr-3 text-text-muted"
               >
                 {showPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
               </button>
@@ -281,15 +248,14 @@ export default function ZamanAIPrototype() {
                   placeholder="Подтвердите пароль"
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border focus:outline-none text-sm sm:text-base text-left"
+                  className="w-full px-4 py-3 rounded-xl border focus:outline-none text-base"
                   required
                   minLength={5}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-3 flex items-center pr-3 text-gray-500 bg-transparent"
-                  aria-label={showConfirmPassword ? "Скрыть пароль" : "Показать пароль"}
+                  className="absolute inset-y-0 right-3 flex items-center pr-3 text-text-muted"
                 >
                   {showConfirmPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
                 </button>
@@ -297,15 +263,14 @@ export default function ZamanAIPrototype() {
             )}
             <button
               type="submit"
-              className="w-full py-3 rounded-xl text-white font-medium text-sm sm:text-base"
-              style={{ background: '#2D9A86' }}
+              className="w-full py-3 rounded-xl text-white font-medium bg-primary"
             >
               {authMode === 'login' ? 'Войти' : 'Зарегистрироваться'}
             </button>
           </form>
-          <p className="text-center mt-4 text-sm text-gray-600">
+          <p className="text-center mt-4 text-sm text-text-muted">
             {authMode === 'login' ? 'Нет аккаунта?' : 'Уже есть аккаунт?'}{' '}
-            <button onClick={toggleAuthMode} className="text-[#2D9A86] hover:underline">
+            <button onClick={toggleAuthMode} className="text-primary hover:underline">
               {authMode === 'login' ? 'Регистрация' : 'Вход'}
             </button>
           </p>
@@ -315,45 +280,47 @@ export default function ZamanAIPrototype() {
   }
 
   return (
-    <div className="min-h-screen  flex flex-col" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui' }}>
-      <header className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 shadow-sm" >
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header */}
+      <header className="flex items-center justify-between px-4 py-4 shadow-sm bg-surface">
         <div className="flex items-center gap-3">
           <img src={logoImage} alt="Логотип Zaman" className="w-12 h-12 rounded-xl object-cover" />
           <div>
-            <div className="text-base sm:text-lg font-semibold">Zaman AI Bank</div>
-            <div className="text-xs text-gray-500">Голосовой & текстовый ассистент</div>
+            <div className="text-lg font-semibold text-text">Zaman AI Bank</div>
+            <div className="text-xs text-text-muted">Голосовой & текстовый ассистент</div>
           </div>
         </div>
-        <nav className="hidden sm:flex gap-4 items-center">
-          <button className="px-3 py-2 rounded-lg font-medium hover:shadow">Продукты</button>
-          <button className="px-3 py-2 rounded-lg font-medium hover:shadow">Цели</button>
-          <button className="px-3 py-2 rounded-lg font-medium hover:shadow">Аналитика</button>
+        <nav className="hidden md:flex gap-4 items-center">
+          <button className="px-3 py-2 rounded-lg font-medium hover:shadow text-text">Продукты</button>
+          <button className="px-3 py-2 rounded-lg font-medium hover:shadow text-text">Цели</button>
+          <button className="px-3 py-2 rounded-lg font-medium hover:shadow text-text">Аналитика</button>
         </nav>
       </header>
 
-      <main className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6">
+      {/* Main Content */}
+      <main className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
         {/* Left: Dream / Goals */}
-        <section className="col-span-1 space-y-4">
-          <div className="rounded-2xl p-4 sm:p-5 shadow-sm border" >
-            <h3 className="text-sm sm:text-base font-semibold">Визуализатор мечты</h3>
-            <p className="text-xs text-gray-500 mt-1">Проследите путь к вашей цели — квартите, путешествию или обучению.</p>
-            <div className="mt-4 bg-gradient-to-r from-[#2D9A86] to-[#EEFE6D] rounded-xl p-4 text-white">
-              <h4 className="font-semibold text-sm sm:text-base">Квартира в 5 лет</h4>
-              <div className="mt-2 text-xs sm:text-sm">Нужно: 15 000 000 ₸</div>
+        <section className="space-y-4">
+          <div className="rounded-2xl p-5 shadow-sm border bg-surface">
+            <h3 className="text-base font-semibold text-text">Визуализатор мечты</h3>
+            <p className="text-text-muted mt-1 text-sm">Проследите путь к вашей цели</p>
+            <div className="mt-4 bg-gradient-to-r from-primary to-secondary rounded-xl p-4 text-white">
+              <h4 className="font-semibold text-base">Квартира в 5 лет</h4>
+              <div className="mt-2 text-sm">Нужно: 15 000 000 ₸</div>
               <div className="mt-3 bg-white/30 rounded-full h-3 w-full">
-                <div style={{ width: '32%' }} className="h-3 rounded-full bg-white/90"></div>
+                <div className="h-3 rounded-full bg-white/90 w-[32%]"></div>
               </div>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <button className="py-2 rounded-lg border text-xs sm:text-sm">Редактировать цель</button>
-              <button className="py-2 rounded-lg text-xs sm:text-sm" style={{ background: '#2D9A86', color: '#fff' }}>Планировать автоматически</button>
+              <button className="py-2 rounded-lg border text-sm">Редактировать цель</button>
+              <button className="py-2 rounded-lg text-white text-sm bg-primary">Планировать автоматически</button>
             </div>
           </div>
 
-          <div className="rounded-2xl p-4 sm:p-5 shadow-sm border" style={{ background: '#fff' }}>
-            <h3 className="text-sm sm:text-base font-semibold">Смена привычек</h3>
-            <p className="text-xs text-gray-500">Небольшие шаги, которые экономят 10-20% в месяц.</p>
-            <ul className="mt-3 list-disc list-inside text-xs sm:text-sm space-y-2">
+          <div className="rounded-2xl p-5 shadow-sm border bg-surface">
+            <h3 className="text-base font-semibold text-text">Смена привычек</h3>
+            <p className="text-text-muted text-sm">Небольшие шаги, которые экономят 10-20% в месяц</p>
+            <ul className="mt-3 list-disc list-inside text-sm space-y-2 text-text">
               <li>Отписаться от ненужных подписок</li>
               <li>Установить недельный лимит на развлечения</li>
               <li>Автосбережения 10% от каждой зарплаты</li>
@@ -361,79 +328,79 @@ export default function ZamanAIPrototype() {
           </div>
         </section>
 
-        {/* Center: Chat / Assistant */}
-        <section className="col-span-1 flex flex-col gap-4 min-h-[400px] md:min-h-0">
-          <div className="rounded-2xl p-4 shadow-sm flex-1 flex flex-col min-h-[300px]" style={{ background: 'linear-gradient(180deg,#FFFFFF, #F7FFF0)' }}>
-            <div ref={chatRef} className="flex-1 overflow-auto p-2 min-h-[200px]" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+        {/* Center: Chat */}
+        <section className="flex flex-col gap-4 min-h-[400px]">
+          <div className="rounded-2xl p-4 shadow-sm flex-1 flex flex-col bg-gradient-to-b from-surface to-secondary/5">
+            <div ref={chatRef} className="flex-1 overflow-auto p-2">
               {messages.map(m => (
                 <div key={m.id} className={`mb-3 max-w-[85%] ${m.from === 'user' ? 'ml-auto text-right' : 'mr-auto text-left'}`}>
-                  <div className={`inline-block px-4 py-2 rounded-xl ${m.from === 'user' ? 'bg-[#2D9A86]/10' : 'bg-white'} shadow-sm ${m.isGenerating ? 'animate-pulse text-gray-500' : ''}`}>
-                    <div className="text-xs sm:text-sm">{m.text}</div>
+                  <div className={`inline-block px-4 py-2 rounded-xl shadow-sm ${m.from === 'user' ? 'bg-primary/10' : 'bg-white'} ${m.isGenerating ? 'animate-pulse text-text-muted' : ''}`}>
+                    <div className="text-sm">{m.text}</div>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="mt-3 flex items-center gap-1 sm:gap-2 flex-wrap">
+            <div className="mt-3 flex items-center gap-2">
               <input 
                 ref={inputRef} 
                 value={input} 
                 onChange={e => setInput(e.target.value)} 
-                onKeyDown={handleKeyDown} // New: Enter to send
+                onKeyDown={handleKeyDown}
                 placeholder="Напишите сообщение или нажмите микрофон" 
-                className="flex-1 px-3 sm:px-4 py-2 sm:py-3 rounded-xl border focus:outline-none text-xs sm:text-sm min-w-0" 
-                disabled={isGenerating} // Disable input while generating
+                className="flex-1 px-4 py-3 rounded-xl border focus:outline-none text-sm" 
+                disabled={isGenerating}
               />
               <button
                 onPointerDown={startRecording}
                 onPointerUp={stopRecording}
-                onPointerCancel={stopRecording} // If finger leaves button
-                title="Зажмите для записи голоса"
-                className={`p-2 sm:p-3 rounded-lg border ${listening ? 'animate-pulse' : ''}`}
-                style={{ background: listening ? '#EEFE6D' : '#fff', touchAction: 'none' }} // touchAction for better mobile
-                disabled={isGenerating} // Disable mic while generating
+                onPointerCancel={stopRecording}
+                className={`p-3 rounded-lg border ${listening ? 'animate-pulse bg-secondary' : 'bg-white'}`}
+                style={{ touchAction: 'none' }}
+                disabled={isGenerating}
               >
-                <FiMic className="w-5 h-5" />
+                <FiMic className="w-5 h-5 text-primary" />
               </button>
               <button 
                 onClick={sendMessage} 
-                className="px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-xs sm:text-sm whitespace-nowrap" 
-                style={{ background: '#2D9A86', color: '#fff' }}
-                disabled={isGenerating || !input.trim()} // Disable button while generating or empty input
+                className="px-4 py-3 rounded-lg text-white text-sm bg-primary disabled:opacity-50" 
+                disabled={isGenerating || !input.trim()}
               >
                 Отправить
               </button>
             </div>
           </div>
 
-          <div className="rounded-2xl p-4 shadow-sm border" style={{ background: '#fff' }}>
-            <h4 className="text-sm sm:text-base font-semibold">Рекомендации</h4>
+          <div className="rounded-2xl p-4 shadow-sm border bg-surface">
+            <h4 className="text-base font-semibold text-text">Рекомендации</h4>
             <div className="mt-3 grid grid-cols-1 gap-2">
-              <div className="p-3 rounded-lg border text-xs sm:text-sm">Депозит "Надёжный" — доходность 8% годовых</div>
-              <div className="p-3 rounded-lg border text-xs sm:text-sm">План "Обучение" — автоматическое откладывание 20 000 ₸</div>
+              <div className="p-3 rounded-lg border text-sm text-text">Депозит "Надёжный" — доходность 8% годовых</div>
+              <div className="p-3 rounded-lg border text-sm text-text">План "Обучение" — автоматическое откладывание 20 000 ₸</div>
             </div>
           </div>
         </section>
 
-        {/* Right: Analytics / Products */}
-        <aside className="col-span-1 space-y-4">
-          <div className="rounded-2xl p-4 shadow-sm border" style={{ background: '#fff' }}>
-            <h4 className="text-sm sm:text-base font-semibold">Аналитика расходов</h4>
-            <p className="text-xs text-gray-500">Последние 30 дней</p>
-            <div className="mt-3 h-32 sm:h-36 rounded-lg p-3 flex items-center justify-center border-dashed">График (placeholder)</div>
+        {/* Right: Analytics */}
+        <aside className="space-y-4">
+          <div className="rounded-2xl p-4 shadow-sm border bg-surface">
+            <h4 className="text-base font-semibold text-text">Аналитика расходов</h4>
+            <p className="text-text-muted text-sm">Последние 30 дней</p>
+            <div className="mt-3 h-36 rounded-lg p-3 flex items-center justify-center border-dashed border-text-muted text-text-muted">График</div>
           </div>
 
-          <div className="rounded-2xl p-4 shadow-sm border" style={{ background: '#fff' }}>
-            <h4 className="text-sm sm:text-base font-semibold">Подобранные продукты</h4>
+          <div className="rounded-2xl p-4 shadow-sm border bg-surface">
+            <h4 className="text-base font-semibold text-text">Подобранные продукты</h4>
             <div className="mt-3 space-y-2">
-              <div className="p-3 rounded-lg border text-xs sm:text-sm">Ипотека + накопительный счёт</div>
-              <div className="p-3 rounded-lg border text-xs sm:text-sm">Сберегательный вклад (исламский)</div>
+              <div className="p-3 rounded-lg border text-sm text-text">Ипотека + накопительный счёт</div>
+              <div className="p-3 rounded-lg border text-sm text-text">Сберегательный вклад (исламский)</div>
             </div>
           </div>
         </aside>
       </main>
 
-      <footer className="p-4 text-center text-xs text-gray-500">Прототип UI — Zaman Bank AI Assistant</footer>
+      <footer className="p-4 text-center text-xs text-text-muted bg-surface">
+        Прототип UI — Zaman Bank AI Assistant
+      </footer>
     </div>
   );
 }
