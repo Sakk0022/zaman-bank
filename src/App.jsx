@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { FiEye, FiEyeOff } from 'react-icons/fi';
 
 // Zaman color tokens
 // Persian Green: #2D9A86
@@ -12,6 +13,13 @@ export default function ZamanAIPrototype() {
   const [input, setInput] = useState('');
   const [listening, setListening] = useState(false);
   const inputRef = useRef();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authMode, setAuthMode] = useState('login');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   function sendMessage() {
     if (!input.trim()) return;
@@ -36,6 +44,119 @@ export default function ZamanAIPrototype() {
         setListening(false);
       }, 1600);
     }
+  }
+
+  function handleAuthSubmit(e) {
+    e.preventDefault();
+    // Dummy authentication logic for prototype
+    if (password.length < 5) {
+      alert('Пароль должен содержать минимум 5 символов');
+      return;
+    }
+    if (authMode === 'register') {
+      if (confirmPassword.length < 5) {
+        alert('Подтверждение пароля должно содержать минимум 5 символов');
+        return;
+      }
+      if (password !== confirmPassword) {
+        alert('Пароли не совпадают');
+        return;
+      }
+    }
+    // Simulate successful login/registration
+    setIsLoggedIn(true);
+    // Reset form fields
+    setUsername('');
+    setPassword('');
+    setConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+  }
+
+  function toggleAuthMode() {
+    setAuthMode(authMode === 'login' ? 'register' : 'login');
+    // Clear fields when toggling
+    setUsername('');
+    setPassword('');
+    setConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-white to-white flex items-center justify-center" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui' }}>
+        <div className="w-full max-w-md p-6 sm:p-8 rounded-2xl shadow-md bg-white mx-auto">
+          <div className="flex justify-center mb-6">
+            <div style={{ width: 60, height: 60, background: '#2D9A86', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '2rem' }}>Z</div>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold text-center mb-6">{authMode === 'login' ? 'Вход в Zaman AI Bank' : 'Регистрация в Zaman AI Bank'}</h2>
+          <form onSubmit={handleAuthSubmit} className="space-y-4 text-left">
+            <input
+              type="text"
+              placeholder="Логин"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border focus:outline-none text-sm sm:text-base text-left"
+              required
+              minLength={1}
+            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Пароль"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border focus:outline-none text-sm sm:text-base text-left"
+                required
+                minLength={5}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 bg-transparent"
+              >
+                {showPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
+              </button>
+            </div>
+            {authMode === 'register' && (
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  placeholder="Подтвердите пароль"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border focus:outline-none text-sm sm:text-base text-left"
+                  required
+                  minLength={5}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 bg-transparent"
+                  aria-label={showConfirmPassword ? "Скрыть пароль" : "Показать пароль"}
+                >
+                  {showConfirmPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
+                </button>
+              </div>
+            )}
+            <button
+              type="submit"
+              className="w-full py-3 rounded-xl text-white font-medium text-sm sm:text-base"
+              style={{ background: '#2D9A86' }} // Changed to solid Persian Green for a different look
+            >
+              {authMode === 'login' ? 'Войти' : 'Зарегистрироваться'}
+            </button>
+          </form>
+          <p className="text-center mt-4 text-sm text-gray-600">
+            {authMode === 'login' ? 'Нет аккаунта?' : 'Уже есть аккаунт?'}{' '}
+            <button onClick={toggleAuthMode} className="text-[#2D9A86] hover:underline">
+              {authMode === 'login' ? 'Регистрация' : 'Вход'}
+            </button>
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
