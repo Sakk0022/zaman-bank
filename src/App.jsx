@@ -1,28 +1,74 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   FiEye, FiEyeOff, FiMic, FiSend, FiSearch, FiChevronDown,
   FiTarget, FiPieChart, FiBarChart2, FiZap, FiClock, FiStar, FiPlus
 } from 'react-icons/fi';
 import logoImage from './assets/zamat.jpeg';
 
-// Zaman color tokens
-// Persian Green: #2D9A86
-// Solar: #EEFE6D
-// Cloud: #FFFFFF
+const API_BASE = 'https://zaman-bank.onrender.com';
+
+// Universal API call with retry
+const apiCall = async (endpoint, options = {}, retries = 3) => {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const config = {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+        ...options,
+      };
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        ...config,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        if (response.status === 404 && attempt < retries - 1) {
+          console.warn(`Attempt ${attempt + 1}: 404, waking up Render...`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          continue;
+        }
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error(`API call error (attempt ${attempt + 1}):`, error);
+      if (error.name === 'AbortError') throw new Error('Request timeout');
+      if (attempt === retries - 1) throw error;
+      console.warn(`Attempt ${attempt + 1} failed: ${error.message}, retrying...`);
+      await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+    }
+  }
+};
 
 export default function ZamanAIPrototype() {
-  // --- НАВИГАЦИЯ МЕЖДУ ЭКРАНАМИ ---
-  const [screen, setScreen] = useState('auth'); // 'auth' | 'landing' | 'chat'
+  // Navigation
+  const [screen, setScreen] = useState('auth');
+  const [loading, setLoading] = useState(false);
 
-  // --- АВТОРИЗАЦИЯ ---
-  const [authMode, setAuthMode] = useState('login'); // login | register
+  // Authorization
+  const [authMode, setAuthMode] = useState('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState(null); // Added for error handling
 
-  // --- ЧАТ/АССИСТЕНТ ---
+  // User Data
+  const [userId, setUserId] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('zaman_token') || null);
+  const [, setUserData] = useState(null);
+
+  // Chat
   const [messages, setMessages] = useState([
     { id: 1, from: 'assistant', text: 'Привет! Я — помощник Zaman. Чем могу помочь сегодня?' }
   ]);
@@ -30,83 +76,98 @@ export default function ZamanAIPrototype() {
   const [listening, setListening] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
 
-  // helpers
+  // Load user data with useCallback to stabilize
+  const loadUserData = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const data = await apiCall(`/user?user_id=${userId}`);
+      setUserData(data);
+      console.log('User data loaded:', data);
+    } catch (error) {
+      console.error('Load user data error:', error);
+      setError('Не удалось загрузить данные пользователя. Попробуйте позже.');
+    }
+  }, [userId]);
+
+  // Auth submit
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    if (password.length < 5) {
+      setError('Пароль должен содержать минимум 5 символов');
+      setLoading(false);
+      return;
+    }
+    if (authMode === 'register' && password !== confirmPassword) {
+      setError('Пароли не совпадают');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const endpoint = authMode === 'login' ? '/login' : '/register';
+      const response = await apiCall(endpoint, {
+        method: 'POST',
+        body: JSON.stringify({ username, password })
+      });
+      
+      setUserId(response.user_id);
+      setToken(response.token);
+      localStorage.setItem('zaman_token', response.token);
+      setScreen('landing');
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Chat send
+  const sendMessage = async () => {
+    const text = input.trim();
+    if (!text) return;
+    
+    pushUser(text);
+    setInput('');
+    setIsTyping(true);
+    setError(null);
+    
+    try {
+      const response = await apiCall('/chat', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          messages: [...messages, { role: 'user', content: text }], 
+          user_id: userId || 1 
+        })
+      });
+      pushAssistant(response.response);
+    // eslint-disable-next-line no-unused-vars
+    } catch (error) {
+      pushAssistant('Извините, произошла ошибка. Попробуйте ещё раз.');
+      setError('Ошибка при отправке сообщения. Попробуйте снова.');
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  // Helpers
   function pushUser(text) {
     setMessages(m => [...m, { id: Date.now(), from: 'user', text }]);
   }
+
   function pushAssistant(text) {
     setMessages(m => [...m, { id: Date.now() + 1, from: 'assistant', text }]);
   }
 
-  // чат
-  function sendMessage() {
-    const text = input.trim();
-    if (!text) return;
-    pushUser(text);
-    setInput('');
-    setIsTyping(true);
-    setTimeout(() => {
-      pushAssistant('Отлично! Давай разберём цель: «Квартира». Сколько удобно откладывать ежемесячно?');
-      setIsTyping(false);
-    }, 700);
-  }
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   }
-  function askQuick(q) {
-    pushUser(q);
-    setIsTyping(true);
-    setTimeout(() => {
-      pushAssistant('Собираю персональные предложения…');
-      setTimeout(() => {
-        pushAssistant('Готово! Я добавил идеи в секцию «Рекомендации».');
-        setIsTyping(false);
-      }, 600);
-    }, 300);
-  }
-  function toggleListen() {
-    setListening(l => !l);
-    if (!listening) {
-      setTimeout(() => {
-        setMessages(m => [...m, { id: Date.now() + 2, from: 'user', text: 'Хочу копить на квартиру, 50000 ₸ в месяц' }]);
-        setIsTyping(true);
-        setTimeout(() => {
-          setMessages(m => [...m, { id: Date.now() + 3, from: 'assistant', text: 'Понял. Составлю план на 5 лет и подберу подходящие продукты.' }]);
-          setIsTyping(false);
-          setListening(false);
-        }, 800);
-      }, 1200);
-    }
-  }
 
-  // auth
-  function handleAuthSubmit(e) {
-    e.preventDefault();
-    if (password.length < 5) {
-      alert('Пароль должен содержать минимум 5 символов');
-      return;
-    }
-    if (authMode === 'register') {
-      if (confirmPassword.length < 5) {
-        alert('Подтверждение пароля должно содержать минимум 5 символов');
-        return;
-      }
-      if (password !== confirmPassword) {
-        alert('Пароли не совпадают');
-        return;
-      }
-    }
-    // ✅ Переход на ЛЕНДИНГ после успешной авторизации
-    setScreen('landing');
-    setUsername('');
-    setPassword('');
-    setConfirmPassword('');
-    setShowPassword(false);
-    setShowConfirmPassword(false);
-  }
   function toggleAuthMode() {
     setAuthMode(authMode === 'login' ? 'register' : 'login');
     setUsername('');
@@ -114,9 +175,44 @@ export default function ZamanAIPrototype() {
     setConfirmPassword('');
     setShowPassword(false);
     setShowConfirmPassword(false);
+    setError(null);
   }
 
-  // =========================== ЭКРАН 1: АВТОРИЗАЦИЯ ===========================
+  function toggleListen() {
+    setListening(l => !l);
+    if (!listening) {
+      setTimeout(() => {
+        const fakeText = 'Хочу копить на квартиру, 50000 ₸ в месяц';
+        pushUser(fakeText);
+        setIsTyping(true);
+        setTimeout(() => {
+          pushAssistant('Понял! Составлю план на 5 лет и подберу халяль-продукты.');
+          setIsTyping(false);
+          setListening(false);
+        }, 800);
+      }, 1200);
+    }
+  }
+
+  // Check token on load
+  useEffect(() => {
+    if (token) {
+      const parts = token.split('_');
+      if (parts[0] === 'user') {
+        setUserId(parseInt(parts[1]));
+        setScreen('landing');
+      }
+    }
+  }, [token]);
+
+  // Load user data when screen is landing and userId exists
+  useEffect(() => {
+    if (screen === 'landing' && userId) {
+      loadUserData();
+    }
+  }, [loadUserData, screen, userId]);
+
+  // Screen 1: Authorization
   if (screen === 'auth') {
     return (
       <div
@@ -128,7 +224,6 @@ export default function ZamanAIPrototype() {
         }}
       >
         <div className="w-full max-w-md">
-          {/* Logo */}
           <div className="text-center mb-8">
             <img src={logoImage} alt="Zaman" className="w-20 h-20 mx-auto rounded-xl object-cover ring-2 ring-white shadow-lg" />
             <h1 className="mt-4 text-2xl font-bold bg-gradient-to-r from-[#2D9A86] to-[#EEFE6D] bg-clip-text text-transparent">
@@ -137,7 +232,6 @@ export default function ZamanAIPrototype() {
             <p className="text-sm text-gray-600 mt-1">Халяль-банкинг нового поколения</p>
           </div>
 
-          {/* Form */}
           <div className="bg-white/90 backdrop-blur border border-black/10 rounded-3xl shadow-xl p-6 space-y-4">
             <h2 className="text-xl font-semibold text-center">
               {authMode === 'login' ? 'Добро пожаловать!' : 'Присоединяйтесь к нам!'}
@@ -145,6 +239,10 @@ export default function ZamanAIPrototype() {
             <p className="text-center text-sm text-gray-600">
               {authMode === 'login' ? 'Войдите в свой аккаунт' : 'Создайте новый аккаунт'}
             </p>
+
+            {error && (
+              <div className="text-red-600 text-sm text-center">{error}</div>
+            )}
 
             <form onSubmit={handleAuthSubmit} className="space-y-4">
               <input
@@ -199,10 +297,11 @@ export default function ZamanAIPrototype() {
 
               <button 
                 type="submit" 
-                className="w-full py-3 rounded-xl text-white text-sm font-semibold shadow-lg hover:shadow-xl transition"
+                disabled={loading}
+                className="w-full py-3 rounded-xl text-white text-sm font-semibold shadow-lg hover:shadow-xl transition disabled:opacity-50"
                 style={{ background: 'linear-gradient(90deg,#2D9A86, #B9F754)' }}
               >
-                {authMode === 'login' ? 'Войти' : 'Зарегистрироваться'}
+                {loading ? 'Загрузка...' : (authMode === 'login' ? 'Войти' : 'Зарегистрироваться')}
               </button>
             </form>
 
@@ -229,7 +328,7 @@ export default function ZamanAIPrototype() {
     );
   }
 
-  // =========================== ЭКРАН 2: ЛЕНДИНГ ===========================
+  // Screen 2: Landing
   if (screen === 'landing') {
     return (
       <div
@@ -240,7 +339,6 @@ export default function ZamanAIPrototype() {
             'radial-gradient(1100px 700px at 0% -10%, #EEFE6D22, transparent 60%), radial-gradient(900px 600px at 120% -10%, #2D9A8622, transparent 60%), #F9FFFD'
         }}
       >
-        {/* TOP NAV */}
         <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-black/5">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
             <div className="flex items-center gap-2">
@@ -273,8 +371,10 @@ export default function ZamanAIPrototype() {
           </div>
         </header>
 
-        {/* HERO */}
         <main className="flex-1">
+          {error && (
+            <div className="max-w-6xl mx-auto px-4 py-4 text-red-600 text-sm">{error}</div>
+          )}
           <div className="max-w-6xl mx-auto px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white/80 backdrop-blur rounded-3xl border border-black/10 p-5 md:p-7 shadow-sm">
               <div className="flex flex-wrap gap-2 text-xs">
@@ -289,7 +389,7 @@ export default function ZamanAIPrototype() {
                 >
                   ZAMAN AI
                 </span>{' '}
-                — ваш халяль-навига́тор по финансам
+                — ваш халяль-навигатор по финансам
               </h1>
 
               <p className="mt-3 text-sm md:text-base opacity-80">
@@ -362,7 +462,7 @@ export default function ZamanAIPrototype() {
     );
   }
 
-  // =========================== ЭКРАН 3: ЧАТ ===========================
+  // Screen 3: Chat
   return (
     <div
       className="min-h-screen flex flex-col"
@@ -372,7 +472,6 @@ export default function ZamanAIPrototype() {
           'radial-gradient(1200px 900px at -10% -10%, #EEFE6D22, transparent 60%), radial-gradient(900px 700px at 120% -20%, #2D9A8626, transparent 60%), #F9FFFD'
       }}
     >
-      {/* HEADER */}
       <header className="sticky top-0 z-30 bg-white/70 backdrop-blur border-b border-black/5">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -404,10 +503,11 @@ export default function ZamanAIPrototype() {
         </div>
       </header>
 
-      {/* MAIN */}
       <main className="flex-1">
+        {error && (
+          <div className="max-w-6xl mx-auto px-4 py-4 text-red-600 text-sm">{error}</div>
+        )}
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* LEFT: Goals & Habits */}
           <section className="space-y-5">
             <div className="rounded-3xl p-5 border border-black/10 bg-white/80 backdrop-blur shadow-sm hover:shadow transition">
               <div className="flex items-center justify-between">
@@ -460,7 +560,10 @@ export default function ZamanAIPrototype() {
               </ul>
               <div className="mt-3 flex flex-wrap gap-2">
                 {['Экономить 20%','Оптимизируй подписки','Включи автосбережения 10%','Сократи такси'].map(c => (
-                  <button key={c} onClick={() => askQuick(c)} className="px-3 py-1 rounded-full text-xs border bg-white hover:bg-white/90 transition">
+                  <button key={c} onClick={() => {
+                    pushUser(c);
+                    sendMessage();
+                  }} className="px-3 py-1 rounded-full text-xs border bg-white hover:bg-white/90 transition">
                     {c}
                   </button>
                 ))}
@@ -468,7 +571,6 @@ export default function ZamanAIPrototype() {
             </div>
           </section>
 
-          {/* CENTER: Chat */}
           <section className="flex flex-col gap-5">
             <div className="rounded-3xl p-4 sm:p-5 border bg-white/70 backdrop-blur shadow-sm flex-1 flex flex-col"
                  style={{ backgroundImage: 'linear-gradient(180deg,#FFFFFFAA,#F5FFEACC)' }}>
@@ -517,7 +619,8 @@ export default function ZamanAIPrototype() {
                 </button>
                 <button
                   onClick={sendMessage}
-                  className="px-4 py-3 rounded-xl text-sm text-white shadow-md hover:shadow-lg flex items-center gap-2"
+                  disabled={isTyping}
+                  className="px-4 py-3 rounded-xl text-sm text-white shadow-md hover:shadow-lg flex items-center gap-2 disabled:opacity-50"
                   style={{ background: '#2D9A86' }}
                 >
                   <FiSend className="w-4 h-4" /> Отправить
@@ -545,7 +648,6 @@ export default function ZamanAIPrototype() {
             </div>
           </section>
 
-          {/* RIGHT: Analytics & Products */}
           <aside className="space-y-5">
             <div className="rounded-3xl p-5 border bg-white/80 backdrop-blur shadow-sm hover:shadow transition">
               <div className="flex items-center justify-between">
@@ -575,7 +677,10 @@ export default function ZamanAIPrototype() {
                 <div className="p-3 rounded-xl border bg-white text-xs sm:text-sm">Кэшбэк-карта 5% рестораны / 2% транспорт</div>
               </div>
               <button
-                onClick={() => askQuick('Сравни ипотеку и накопительный счёт')}
+                onClick={() => {
+                  pushUser('Сравни ипотеку и накопительный счёт');
+                  sendMessage();
+                }}
                 className="mt-3 w-full py-2 rounded-xl text-xs sm:text-sm text-white shadow-md hover:shadow"
                 style={{ background: '#2D9A86' }}
               >
