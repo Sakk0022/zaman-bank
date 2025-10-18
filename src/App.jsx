@@ -114,7 +114,7 @@ export default function ZamanAIPrototype() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 bg-transparent"
+                className="absolute inset-y-0 right-3 flex items-center pr-3 text-gray-500 bg-transparent"
               >
                 {showPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
               </button>
@@ -133,7 +133,7 @@ export default function ZamanAIPrototype() {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 bg-transparent"
+                  className="absolute inset-y-0 right-3 flex items-center pr-3 text-gray-500 bg-transparent"
                   aria-label={showConfirmPassword ? "Скрыть пароль" : "Показать пароль"}
                 >
                   {showConfirmPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
