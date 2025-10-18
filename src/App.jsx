@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { FiEye, FiEyeOff, FiMic } from 'react-icons/fi';
+import logoImage from './assets/zamat.jpeg';
 
 // Zaman color tokens
 // Persian Green: #2D9A86
@@ -88,7 +89,12 @@ export default function ZamanAIPrototype() {
       <div className="min-h-screen bg-gradient-to-b from-white to-white flex items-center justify-center" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui' }}>
         <div className="w-full max-w-md p-6 sm:p-8 rounded-2xl shadow-md bg-white mx-auto">
           <div className="flex justify-center mb-6">
-            <div style={{ width: 60, height: 60, background: '#2D9A86', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '2rem' }}>Z</div>
+          <img
+  src={logoImage}
+  alt="Логотип Zaman"
+  className="w-14 h-14 rounded-xl object-cover"
+/>
+
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-center mb-6">{authMode === 'login' ? 'Вход в Zaman AI Bank' : 'Регистрация в Zaman AI Bank'}</h2>
           <form onSubmit={handleAuthSubmit} className="space-y-4 text-left">
@@ -163,7 +169,11 @@ export default function ZamanAIPrototype() {
     <div className="min-h-screen bg-gradient-to-b from-white to-white flex flex-col" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui' }}>
       <header className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 shadow-sm" style={{ background: '#ffffff' }}>
         <div className="flex items-center gap-3">
-          <div style={{ width: 44, height: 44, background: '#2D9A86', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700 }}>Z</div>
+        <img
+  src={logoImage}
+  alt="Логотип Zaman"
+  className="w-12 h-12 rounded-xl object-cover"
+/>
           <div>
             <div className="text-base sm:text-lg font-semibold">Zaman AI Bank</div>
             <div className="text-xs text-gray-500">Голосовой & текстовый ассистент</div>
