@@ -74,3 +74,17 @@ button:focus-visible {
     background: transparent; /* на всякий случай */
   }
 }
+
+/* Добавить В КОНЕЦ index.css */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #ffffff !important;
+  }
+  
+  /* Фикс для всех белых блоков */
+  div[style*="background: #ffffff"],
+  div[style*="from-white"] {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}
