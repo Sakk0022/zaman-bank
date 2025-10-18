@@ -316,7 +316,7 @@ export default function ZamanAIPrototype() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-white flex flex-col" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui' }}>
-      <header className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 shadow-sm" style={{ background: '#ffffff' }}>
+      <header className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 shadow-sm" >
         <div className="flex items-center gap-3">
           <img src={logoImage} alt="Логотип Zaman" className="w-12 h-12 rounded-xl object-cover" />
           <div>
@@ -334,7 +334,7 @@ export default function ZamanAIPrototype() {
       <main className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6">
         {/* Left: Dream / Goals */}
         <section className="col-span-1 space-y-4">
-          <div className="rounded-2xl p-4 sm:p-5 shadow-sm border" style={{ background: '#ffffff' }}>
+          <div className="rounded-2xl p-4 sm:p-5 shadow-sm border" >
             <h3 className="text-sm sm:text-base font-semibold">Визуализатор мечты</h3>
             <p className="text-xs text-gray-500 mt-1">Проследите путь к вашей цели — квартите, путешествию или обучению.</p>
             <div className="mt-4 bg-gradient-to-r from-[#2D9A86] to-[#EEFE6D] rounded-xl p-4 text-white">
