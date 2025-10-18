@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiEye, FiEyeOff, FiMic } from 'react-icons/fi';
 
 // Zaman color tokens
 // Persian Green: #2D9A86
@@ -220,10 +220,10 @@ export default function ZamanAIPrototype() {
               ))}
             </div>
 
-            <div className="mt-3 flex items-center gap-2 sm:gap-3 flex-wrap">
+            <div className="mt-3 flex items-center gap-1 sm:gap-2 flex-wrap">
               <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)} placeholder="Напишите сообщение или нажмите микрофон" className="flex-1 px-3 sm:px-4 py-2 sm:py-3 rounded-xl border focus:outline-none text-xs sm:text-sm min-w-0" />
               <button onClick={toggleListen} title="Голосовой ввод" className={`p-2 sm:p-3 rounded-lg border ${listening ? 'animate-pulse' : ''}`} style={{ background: listening ? '#EEFE6D' : '#fff' }}>
-                🎤
+              <FiMic className="w-5 h-5" />
               </button>
               <button onClick={sendMessage} className="px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-xs sm:text-sm whitespace-nowrap" style={{ background: '#2D9A86', color: '#fff' }}>Отправить</button>
             </div>
