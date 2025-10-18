@@ -240,7 +240,7 @@ export default function ZamanAIPrototype() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-white to-white flex items-center justify-center" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui' }}>
+      <div className="min-h-screen  flex items-center justify-center" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui' }}>
         <div className="w-full max-w-md p-6 sm:p-8 rounded-2xl shadow-md bg-white mx-auto">
           <div className="flex justify-center mb-6">
             <img src={logoImage} alt="Логотип Zaman" className="w-14 h-14 rounded-xl object-cover" />
@@ -315,7 +315,7 @@ export default function ZamanAIPrototype() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-white flex flex-col" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui' }}>
+    <div className="min-h-screen  flex flex-col" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui' }}>
       <header className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 shadow-sm" >
         <div className="flex items-center gap-3">
           <img src={logoImage} alt="Логотип Zaman" className="w-12 h-12 rounded-xl object-cover" />
