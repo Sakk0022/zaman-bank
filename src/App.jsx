@@ -5,7 +5,7 @@ import {
 } from 'react-icons/fi';
 import logoImage from './assets/zamat.jpeg';
 
-const API_BASE = 'https://zaman-bank.onrender.com';
+const API_BASE = 'https://zaman-ai.onrender.com';
 
 // Universal API call with retry
 const apiCall = async (endpoint, options = {}, retries = 3) => {
