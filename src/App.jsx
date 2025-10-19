@@ -125,33 +125,46 @@ export default function ZamanAIPrototype() {
   };
 
   // Chat send
-  const sendMessage = async () => {
-    const text = input.trim();
-    if (!text) return;
+  // Chat send
+const sendMessage = async () => {
+  const text = input.trim();
+  if (!text) return;
+  
+  pushUser(text);
+  setInput('');
+  setIsTyping(true);
+  setError(null);
+  
+  try {
+    // Форматируем сообщения правильно для бэкенда
+    const formattedMessages = messages.map(msg => ({
+      role: msg.from === 'user' ? 'user' : 'assistant',
+      content: msg.text
+    }));
     
-    pushUser(text);
-    setInput('');
-    setIsTyping(true);
-    setError(null);
-    
-    try {
-      const response = await apiCall('/chat', {
-        method: 'POST',
-        body: JSON.stringify({ 
-          messages: [...messages, { role: 'user', content: text }], 
-          user_id: userId || 1 
-        })
-      });
-      pushAssistant(response.response);
-    // eslint-disable-next-line no-unused-vars
-    } catch (error) {
-      pushAssistant('Извините, произошла ошибка. Попробуйте ещё раз.');
-      setError('Ошибка при отправке сообщения. Попробуйте снова.');
-    } finally {
-      setIsTyping(false);
-    }
-  };
+    // Добавляем новое сообщение пользователя
+    const messagesToSend = [
+      ...formattedMessages,
+      { role: 'user', content: text }
+    ];
 
+    const response = await apiCall('/chat', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        messages: messagesToSend,
+        user_id: userId || 1 
+      })
+    });
+    
+    pushAssistant(response.response);
+  } catch (error) {
+    console.error('Send message error:', error);
+    pushAssistant('Извините, произошла ошибка. Попробуйте ещё раз.');
+    setError('Ошибка при отправке сообщения: ' + error.message);
+  } finally {
+    setIsTyping(false);
+  }
+};
   // Helpers
   function pushUser(text) {
     setMessages(m => [...m, { id: Date.now(), from: 'user', text }]);
